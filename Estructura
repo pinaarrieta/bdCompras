@@ -1,0 +1,639 @@
+--Proyecto de base de datos para compras***********************
+--Grupo Operador de Alimentos Emho
+--Erick Genro Pi�a Arrieta Barbosa
+--CDMX a 5 de diciembre de 2025
+--Estructura de la base de datos
+--*************************************************************************************
+
+--Creación de base de datos
+
+use master;
+create database bdCompras;
+
+use bdCompras;
+
+--Esquemas principales
+
+create schema Proveedor;--Creado
+create schema Empresa;	--Creado
+create schema Cliente;	--Creado
+create schema Entidad;	--Creado
+create schema Catalogo; --Creado
+create schema SAT;      --Crreado
+create schema Transaccion; --Creado
+
+--*************************************Esquema de Entidades Federativas***************************
+create table Entidad.Nombre(id_Entidad int not null, 
+                            Nombre nvarchar(32) not null
+							   
+							constraint pk_Entidades_Nombres_id_Entidad
+							primary key(id_Entidad)
+						   ); 	--Creada
+
+--Vista de datos
+create view vwEntidad_Nombre as
+	select id_entidad as [ENTIDAD No.], Nombre as [ENTIDAD FEDERATIVA]
+		from Entidad.Nombre; --Creada
+
+select * from vwEntidad_Nombre; --Correcto
+
+--************************************ Esquema de Clientes ************************************
+
+--Tabla de nombres de clientes
+create table Cliente.Nombre(id_Cliente int identity(1,1) not null,
+							  Nombre nvarchar(240) not null,
+							  Ambito nvarchar(16)
+
+							  constraint pk_Clientes_Nombres_id_Cliente
+							  primary key(id_Cliente)
+							 ); -- Creada
+
+--Vista de datos
+
+create view vwCliente_Nombre as
+	select id_Cliente as [ID DEL CLIENTE], Nombre as [NOMBRE DEL CLIENTE]
+		from Cliente.Nombre; --Creada
+
+select * from vwCliente_Nombre; --Correcto
+
+--Tabla de sucursales de clientes
+
+create table Cliente.Sucursal(id_Sucursal int identity(1,1) not null,
+								 id_Cliente int not null,
+								 Nombre nvarchar(240) not null,
+								 id_Entidad int  not null
+
+								 constraint pk_Cliente_Sucursal_id_Sucursal
+								 primary key(id_Sucursal),
+
+								 constraint fk_Cliente_Sucursal_id_Cliente
+								 foreign key(id_Cliente)
+								 references Cliente.Nombre(id_Cliente),
+
+								 constraint fk_Cliente_Sucursal_id_Entidad
+								 foreign key(id_Entidad)
+								 references Entidad.Nombre(id_Entidad)
+								); --Creada
+
+--Crear vista de datos
+create view vw_Cliente_Sucursal as
+	select cs.id_Sucursal as ID, cn.Nombre as CLIENTE, cs.Nombre as SUCURSAL, en.Nombre as ENTIDAD
+		from Cliente.Sucursal cs
+			join Cliente.Nombre as cn
+				on cn.id_Cliente = cs.id_Cliente
+			join Entidad.Nombre as en
+				on en.id_Entidad = cs.id_Entidad; --Creada
+
+select * from vw_Cliente_Sucursal; --Correcto
+
+--************************************ Esquema Proveedor **********************************
+--Tabla de giros comerciales
+create table Proveedor.Giros_Comerciales
+							(id_Giro int identity(1,1) not null,
+							 Giro nvarchar(64) not null,
+							 Subgiro nvarchar(64), --opcional
+							 Sub_Subgiro nvarchar(64) --opcional
+
+							 constraint pk_Proveedor_Giros_Comerciales_id_Giro
+							 primary key(id_Giro)
+							); --Creada
+
+--Crear vista de datos
+create view vwProveedor_Giros_comerciales as
+	select pg.id_Giro as ID, pg.Giro as GIRO, pg.Subgiro as SUBGIRO, 
+		   pg.Sub_Subgiro as [SUB SUBGIRO]
+		from Proveedor.Giros_Comerciales pg;
+
+select * from vwProveedor_Giros_comerciales; --Correcto
+
+--Tabla principal de proveedores
+create table Proveedor.Nombre(id_Proveedor int identity(1,1) not null,
+							  RFC varchar(13) not null,
+							  Razon_Social nvarchar(240) not null,
+							  Nombre_Comercial nvarchar(128)
+
+							  --Clave primaria
+							  constraint pk_Proveedor_Nombre_id_Proveedor
+							  primary key (id_Proveedor),
+
+							  --Validación de RFC
+							  constraint uq_Nombre_Proveedor_RFC
+							  unique(RFC),
+
+							  constraint chk_Nombre_Proveedor_RFC_len
+							  check(len(RFC) in (12,13))
+							 );
+
+--Probar Check LEN del RFC
+insert into Proveedor.Nombre(RFC, Razon_Social, Nombre_Comercial)
+	values('AADE800106IH3', 'duplicaria rfc', 'no debe pasar'); --Correcto
+
+insert into Proveedor.Nombre(RFC, Razon_Social, Nombre_Comercial)
+	values('AADE800106IH3888888', 'el rfc es mayo a 13 carcteres', 'no debe pasar'); --Correcto
+
+insert into Proveedor.Nombre(RFC, Razon_Social, Nombre_Comercial)
+	values('PIBE761012', 'el rfc es menor a 12 caracteres', 'no debe pasar'); --Correcto
+
+--Crear vista
+create view vw_Proveedor_Nombre as
+select pn.id_Proveedor as [ID_PROVEEDOR],
+	   pn.RFC,
+	   pn.Razon_Social as [RAZON SOCIAL],
+	   pn.Nombre_Comercial as [NOMBRE COMERCIAL]
+	from Proveedor.Nombre pn; --Creada
+
+select * from vw_Proveedor_Nombre; --Correcto
+select * from vwProveedor_Giros_comerciales; --Correcto
+
+--Tabla pivote Proveedor.Giro
+
+create table Proveedor.Giro(id_Proveedor int not null,
+							id_Giro int not null
+
+							constraint pk_Proveedor_Giro
+							primary key(id_Proveedor, id_Giro)
+
+							constraint fk_Proveedor_Giro_id_Proveedor
+							foreign key(id_Proveedor)
+							references Proveedor.Nombre(id_Proveedor),
+
+							constraint fkProveedor_Giro_id_Giro
+							foreign key(id_Giro)
+							references Proveedor.Giros_Comerciales(id_Giro)
+							);
+
+--Vista
+create view vw_Proveedor_Giro as
+	select pn.Razon_Social AS [RAZON SOCIAL],
+		   concat(pgc.Giro, '-',
+				  pgc.Subgiro, '-', 
+				  pgc.Sub_Subgiro, '-'
+				 ) as [GIROS COMERCIALES]
+		from Proveedor.Giro pg
+			inner join Proveedor.Nombre pn
+				on pn.id_Proveedor = pg.id_Proveedor
+			inner join Proveedor.Giros_Comerciales pgc
+				on pgc.id_Giro = pg.id_Giro; --Creada 
+
+select * from vw_Proveedor_Giro; --ok
+
+select * from Proveedor.Giros_Comerciales; --ok
+
+--Tabla de RFC´s receptores o empresas
+create table Empresa.Nombre(id_Empresa int identity(1,1) not null,
+							RFC varchar(13) not null,
+							Razon_Social nvarchar(240) not null
+
+							--Clave primaria
+							constraint pk_Empresa_Nombre_id_Empresa
+							primary key(id_Empresa),
+
+							--Validación del RFC
+							constraint uq_Empresa_Nombre_RFC
+							unique(RFC),
+
+							constraint chk_Empresa_Nombre_RFC
+							check(len(RFC) in (12,13))
+						   );  --Creada
+
+--Crear vista
+create view vw_Empresa_Nombre as
+select em.id_Empresa as ID,
+	   em.RFC,
+	   em.Razon_Social as [RAZON SOCIAL]
+	from Empresa.Nombre em; --Creada
+
+select * from vw_Empresa_Nombre; --Ok
+
+--Crear las Bodegas de la empresa 29/12/2025
+create table Empresa.Bodega(id_Bodega int identity(1,1) not null,
+						    Nombre nvarchar(48) not null,
+							id_Empresa int not null,
+							id_Entidad int not null
+
+							--Clave primaria
+							constraint pk_Empresa_Bodega_id_Bodega
+							primary key(id_Bodega),
+
+							--Claves foráneas
+							constraint fk_Empresa_Bodega_id_Empresa
+							foreign key(id_Empresa)
+							references Empresa.Nombre(id_Empresa),
+
+							constraint fk_Empresa_Bodega_id_Entidad
+							foreign key(id_Entidad)
+							references Entidad.Nombre(id_Entidad)
+						   ); --Creada
+
+--Crear vista
+create view vw_Empresa_Bodega as
+	select eb.id_Bodega as ID, 
+		   eb.Nombre as NOMBRE,
+		   en.Razon_Social as EMPRESA,
+		   eno.Nombre as ENTIDAD
+		from Empresa.Bodega eb
+		join Empresa.Nombre en
+			on eb.id_Empresa = en.id_Empresa
+		join Entidad.Nombre eno
+			on eb.id_Entidad = eno.id_Entidad; --Creada
+
+select * from vw_Empresa_Bodega eb
+	order by eb.NOMBRE; --ok
+
+--Tabla de facturas emitidas por proveedores  
+create table Proveedor.Factura(id_Factura int identity(1,1) not null, 
+							   Ejercicio int not null,
+							   Mes int not null,
+							   UUID char(36) not null,
+							   Serie varchar(24),
+							   Folio varchar(24),
+							   Fecha date not null,
+							   Subtotal decimal(12,2) not null,
+							   Descuento decimal(12,2) not null default 0,
+							   Total_Impuestos_Trasladados decimal (12,2) not null default 0,
+							   Total decimal(12,2) not null,
+							   id_Proveedor int not null,
+							   id_Empresa int not null,
+							   Link_CFDI nvarchar(240) not null default 'No Disponible',
+							   --Clave primaria
+							   constraint pk_Proveedor_Factura_id_Factura
+							   primary key(id_Factura),
+							   							   
+							   --Claves foráneas
+							   constraint fk_Proveedor_Factura_idProveedor
+							   foreign key(id_Proveedor)
+							   references Proveedor.Nombre(id_Proveedor),
+
+							   constraint fk_Proveedor_Factura_id_Empresa
+							   foreign key(id_Empresa)
+							   references  Empresa.Nombre(id_Empresa),
+
+							   -- Índices
+							   index ix_Proveedor_Factura_id_Proveedor_Fecha(id_Proveedor, Fecha),
+
+							   --Validación de datos 
+
+							   constraint chk_Proveedor_Factura_Ejercicio
+							   check(Ejercicio >= 2025 and Ejercicio <= 2035),
+
+							   constraint chk_Proveedor_Factura_Mes
+							   check(Mes between 1 and 12),
+
+							   constraint uq_Proveedor_Factura
+							   unique(UUID),
+
+							   constraint chk_Proveedor_Factura_UUID
+							   CHECK (UUID LIKE '[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]-[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]-[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]-[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]-[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]')
+							  );-- Creado
+
+--	Crea la vista
+create view vw_Proveedor_Factura as
+select pf.id_Factura as ID,
+	   pf.Ejercicio as EJERCICIO,
+	   pf.Mes as MES,
+	   pf.UUID as [FOLIO FISCAL],
+	   pf.Serie as SERIE,
+	   pf.Folio as FOLIO,
+	   pf.Fecha as FECHA,
+	   pf.Subtotal as SUBTOTAL,
+	   pf.Descuento as DESCUENTO,
+	   pf.Total_Impuestos_Trasladados as [IMPUESTOS TRASLADADOS],
+	   pf.Total as TOTAL,
+	   pn.RFC as [RFC EMISOR],
+	   pn.Razon_Social as [PROVEEDOR],
+	   en.RFC as [RFC RECEPTOR],
+	   en.Razon_Social as EMPRESA
+	from Proveedor.Factura pf
+	join Proveedor.Nombre pn
+		on pf.id_Proveedor = pn.id_Proveedor
+	join Empresa.Nombre en
+		on pf.id_Empresa = en.id_Empresa
+	   ; --Creada
+
+select * from vw_Proveedor_Factura; --ok
+
+
+--*****************************ESQUEMA CATALOGO******************************************
+
+create table Catalogo.Grupo(id_Grupo int identity(1,1) not null, 
+                            Nombre nvarchar(62) not null,
+
+							constraint pk_Catalogo_Grupo_id_Grupo
+							primary key(id_Grupo),
+
+							constraint uq_Catalogo_Grupo_Nombre
+							unique(Nombre)
+						   ); --Creado
+
+create table Catalogo.Subgrupo(id_Subgrupo int identity(1,1) not null,
+							   Nombre nvarchar(62) not null,
+							   id_Grupo int,
+
+							   constraint pk_Catalogo_Subgrupo_id_Subgrupo
+							   primary key(id_Subgrupo),
+
+							   constraint uq_Catalogo_Subgrupo_Nombre
+							   unique(Nombre),
+
+							   constraint fk_Catalogo_Subgrupo_id_Grupo
+							   foreign key(id_Grupo)
+							   references Catalogo.Grupo(id_Grupo)
+							  ); --Creado
+
+
+create table Catalogo.Producto(id_Producto int identity(1,1) not null,
+							   Nombre nvarchar(62) not null,
+							   id_Subgrupo int not null,
+
+							   constraint pk_Catalogo_Producto_id_Producto
+							   primary key(id_Producto),
+
+							   constraint uq_Catalogo_Producto_Nombre
+							   unique(Nombre),
+
+							   constraint fk_Catalogo_Producto_id_Subgrupo
+							   foreign key(id_Subgrupo)
+							   references Catalogo.Subgrupo(id_Subgrupo)
+							  ); --creada
+
+create table Catalogo.Subproducto(id_Subproducto int identity(1,1) not null,
+								  Nombre nvarchar(240) not null,
+								  id_Producto int,
+
+								  constraint pk_Catalogo_Subproducto_id_Subproducto
+								  primary key(id_Subproducto),
+
+								  constraint uq_Catalogo_Subproducto_id_Subproducto
+								  unique(Nombre),
+
+								  constraint fk_Catalogo_Subproducto_id_Producto
+								  foreign key(id_Producto)
+								  references Catalogo.Producto(id_Producto)
+								 ); --Creada
+
+--Vista de los grupos del catalogo
+create view vw_Catalogo_Grupo as
+select cg.id_Grupo, cg.Nombre
+from Catalogo.Grupo cg;
+
+select * from vw_Catalogo_Grupo;
+
+--Vista del subgrupo del catalogo
+create view vw_Catalogo_Subgrupo as
+select cg.id_Grupo as [ID_GPO],
+	   cg.Nombre as [GRUPO],
+	   cs.id_Subgrupo as [ID_SG],
+	   cs.Nombre as [SUBGRUPO]
+	from Catalogo.Grupo cg
+	join Catalogo.Subgrupo cs
+	on cg.id_Grupo = cs.id_Grupo; --Creada
+
+select * from vw_Catalogo_Subgrupo cs
+order by cs.GRUPO asc, cs.SUBGRUPO asc; --OK
+
+--Vista de Productos del Catálogo de Productos
+create view vw_Catalogo_Producto as
+select cg.id_Grupo as [ID_GPO],
+	   cg.Nombre as [GRUPO],
+	   cs.id_Subgrupo as [ID_SG],
+	   cs.Nombre as [SUBGRUPO],
+	   cp.id_Producto as [ID_PROD],
+	   cp.Nombre as [PRODUCTO]
+	from Catalogo.Grupo cg
+	join Catalogo.Subgrupo cs
+	on cg.id_Grupo = cs.id_Grupo
+	join Catalogo.Producto cp
+	on cs.id_Subgrupo = cp.id_Subgrupo; --creada
+
+select * from vw_Catalogo_Producto cp
+order by cp.GRUPO asc, cp.SUBGRUPO asc, cp.PRODUCTO asc; --OK
+
+
+--Vista de los Subproductos del catálogo
+create view vw_Catalogo_Subproducto as
+select cg.id_Grupo as [ID_GPO],
+	   cg.Nombre as [GRUPO],
+	   cs.id_Subgrupo as [ID_SG],
+	   cs.Nombre as [SUBGRUPO],
+	   cp.id_Producto as [ID_PROD],
+	   cp.Nombre as [PRODUCTO],
+	   csp.id_Subproducto as [ID_SUBPROD],
+	   csp.Nombre as [SUBPRODUCTO]
+	from Catalogo.Grupo cg
+	join Catalogo.Subgrupo cs
+	on cg.id_Grupo = cs.id_Grupo
+	join Catalogo.Producto cp
+	on cs.id_Subgrupo = cp.id_Subgrupo
+	join Catalogo.Subproducto csp
+	on csp.id_Producto = cp.id_Producto;
+
+select * from vw_Catalogo_Subproducto wcs
+order by wcs.GRUPO asc,
+		 wcs.SUBGRUPO asc,
+		 wcs.PRODUCTO asc,
+		 wcs.SUBPRODUCTO asc;
+							  
+---*************************** ESQUEMA SAT ***********************************************
+create table SAT.Catalogo_Producto_Servicio(id_Producto_Servicio int not null,
+	                               nombre nvarchar(160),
+	                               constraint pk_SAT_Producto_Servicio_id_Producto_Servicio
+	                               primary key(id_Producto_servicio)
+								  ); --Creado
+
+--Modificar el campo SAT.Catalogo_Producto_Servicio.nombre a not null
+alter table SAT.Catalogo_Producto_Servicio
+	alter column nombre nvarchar(160) not null;	--Correcto
+ 
+--Crear vista
+create view vw_SAT_Catalogo_Producto_Servicio as
+	select id_Producto_Servicio as ID,
+		   nombre as NOMBRE
+		from SAT.Catalogo_Producto_Servicio; --52,513 registros
+
+select * from vw_SAT_Catalogo_Producto_Servicio; --Correcto
+
+--Tabla de unidades de medida del SAT
+ create table SAT.Catalogo_Unidad_Medidas(id_Unidad smallint not null,
+								 Clave_Unidad varchar(8) not null,
+								 Nombre nvarchar(160) not null,
+								 constraint pk_SAT_Catalogo_Unidad_Medidas_id_Unidad
+								 primary key(id_Unidad)
+								 ); --Creada
+
+--Modificar el campo Clave_Unidad a unique
+ alter table SAT.Catalogo_Unidad_Medidas
+	 add constraint uq_SAT_Catalogo_Unidad_Medidas_Clave_Unidad
+	 unique(Clave_Unidad); 
+
+
+--Crear vista
+ create view vw_SAT_Catalogo_Unidad_Medidas as
+	 select id_Unidad as ID,
+			Clave_Unidad as [CLAVE UNIDAD],
+			Nombre as NOMBRE
+		 from SAT.Catalogo_Unidad_Medidas; --Creada, 2418 registros
+
+select * from vw_SAT_Catalogo_Unidad_Medidas; --Correcto
+
+--Tabla de catálogo de monedas del SAT
+ create table SAT.Catalogo_Moneda(id_Moneda tinyint not null,
+								  Clave_Moneda char(3) not null,
+								  Nombre nvarchar(120) not null,
+								  constraint pk_SAT_Catalogo_Moneda_id_Moneda
+								  primary key(id_Moneda)
+								 ); --Creada
+
+--Modificar el campo Clave_Moneda a unique
+ alter table SAT.Catalogo_Moneda
+	 add constraint uq_SAT_Catalogo_Moneda_Clave_Moneda
+	 unique(Clave_Moneda); --Correcto
+
+--Crear vista
+ create view vw_SAT_Catalogo_Moneda as
+	 select id_Moneda as ID,
+			Clave_Moneda as [CLAVE MONEDA],
+			Nombre as NOMBRE
+		 from SAT.Catalogo_Moneda; --Creada, 183 registros
+
+select * from vw_SAT_Catalogo_Moneda; --Correcto
+
+--*********************************** Esquema Transacción ****************************
+
+--Tabla Transaccion.Factura
+create table Transaccion.Factura(
+	id_Transaccion int identity(1,1) not null,
+	UUID char(36) not null,
+	CFDI_Nombre_Archivo nvarchar(120) not null,
+	CFDI_Version decimal(4,2) not null,
+	CFDI_Serie nvarchar(32),
+	CFDI_Folio nvarchar(32),
+	CFDI_Fecha datetime2(0) not null,
+	CFDI_Subtotal decimal(12,2) not null,
+	CFDI_Total decimal(12,2) not null,
+	Clave_Moneda char(3) not null,
+	CFDI_Tipo_Comprobante char(1) not null,
+	CFDI_Metodo_Pago char(3) not null,
+	CFDI_Forma_Pago char(2) not null,
+	Emisor_RFC varchar(13) not null,
+	Emisor_Nombre nvarchar(240) not null,
+	Emisor_Regimen_Fiscal smallint not null,
+	Receptor_RFC varchar(13) not null,
+	Receptor_Nombre nvarchar(240) not null,
+	Receptor_Uso_CFDI char(3) not null,
+	Concepto_No_Identificacion nvarchar(128),
+	Concepto_Descripcion nvarchar(240) not null,
+	id_Producto_Servicio int not null,
+	Concepto_Cantidad decimal(12,2) not null,
+	Clave_Unidad varchar(3) not null,
+	Concepto_Unidad nvarchar(128),
+	Concepto_Valor_Unitario decimal(12,2) not null,
+	Concepto_Importe decimal(12,2) not null,
+	Concepto_Descuento decimal(12,2) not null,
+	Impuesto_IVA_Base decimal(12,2) not null,
+	Impuesto_IVA_TasaCuota decimal(3,2) not null,
+	Impuesto_IVA_Importe decimal(12,2) not null,
+	Impuesto_IEPS_Base decimal(12,2) not null,
+	Impuesto_IEPS_TasaCuota decimal(3,2) not null,
+	Impuesto_IEPS_Importe decimal(12,2) not null,
+	--Clave primaria
+	constraint pk_Transaccion_Factura_id_Transaccion
+	primary key(id_Transaccion),
+	--Claves foráneas
+	constraint fk_Transaccion_Factura_UUID
+	foreign key(UUID)
+	references Proveedor.Factura(UUID),
+
+	constraint fk_Transaccion_Factura_Clave_Moneda
+	foreign key(Clave_Moneda)
+	references SAT.Catalogo_Moneda(Clave_Moneda),
+
+	constraint fk_Transaccion_Factura_id_Producto_Servicio
+	foreign key(id_Producto_Servicio)
+	references SAT.Catalogo_Producto_Servicio(id_Producto_Servicio),
+
+	constraint fk_Transaccion_Factura_Clave_Unidad
+	foreign key(Clave_Unidad)
+	references SAT.Catalogo_Unidad_Medidas(Clave_Unidad),
+
+	--Validacíón de datos
+	constraint chk_Transaccion_Factura_CFDI_Tipo_Comprobante
+	check(CFDI_Tipo_Comprobante in ('I','i')), --Solo se aceptan CFDI de Ingresos = I
+
+	constraint chk_Transaccion_Factura_CFDI_Metodo_Pago
+	check(CFDI_Metodo_Pago in ('PUE','PPD')),--PUE Pago en una sola exhibición 
+											 --PPD Pago en parcialidades o diferido
+	constraint chk_Transaccion_Factura_CFDI_Forma_Pago
+	check(CFDI_Forma_Pago like '[0-9][0-9]'),--Dos dígitos numéricos
+
+	constraint chk_Transaccion_Factura_Emisor_RFC
+	check(len(Emisor_RFC) in (12,13)),--Solo 12 o 13 caracteres
+
+	constraint chk_Transaccion_Factura_Receptor_RFC
+	check(len(Receptor_RFC) in (12,13)),--Solo 12 o 13 caracteres
+
+	constraint chk_Transaccion_Factura_UUID
+	CHECK(UUID LIKE '[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]-[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]-[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]-[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]-[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]')
+); --Fin de create table Transaccion.Factura, creada
+
+--Índices de la tabla Transaccion.Factura
+create nonclustered index ix_Transaccion_Factura_CFDI_Fecha
+on Transaccion.Factura (CFDI_Fecha); --Correcto
+
+--Crear vista de la tabla Transaccion.Factura
+create view vw_Transaccion_Factura as
+select 
+	pn.Razon_Social,
+	tf.UUID,
+	tf.CFDI_Nombre_Archivo,
+	tf.CFDI_Version,
+	tf.CFDI_Serie,
+	tf.CFDI_Folio,
+	tf.CFDI_Fecha,
+	tf.CFDI_Subtotal,
+	tf.CFDI_Total,
+	tf.Clave_Moneda,
+	tf.CFDI_Tipo_Comprobante,
+	tf.CFDI_Metodo_Pago,
+	tf.CFDI_Forma_Pago,
+	tf.Emisor_RFC,
+	tf.Emisor_Nombre,
+	tf.Emisor_Regimen_Fiscal,
+	tf.Receptor_RFC,
+	tf.Receptor_Nombre,
+	tf.Receptor_Uso_CFDI,
+	tf.Concepto_No_Identificacion,
+	tf.Concepto_Descripcion,
+	tf.id_Producto_Servicio,
+	tf.Concepto_Cantidad,
+	tf.Clave_Unidad,
+	tf.Concepto_Unidad,
+	tf.Concepto_Valor_Unitario,
+	tf.Concepto_Importe,
+	tf.Concepto_Descuento,
+	tf.Impuesto_IVA_Base,
+	tf.Impuesto_IVA_TasaCuota,
+	tf.Impuesto_IVA_Importe,
+	tf.Impuesto_IEPS_Base,
+	tf.Impuesto_IEPS_TasaCuota,
+	tf.Impuesto_IEPS_Importe
+from Transaccion.Factura tf
+join Proveedor.Factura pf
+on tf.UUID = pf.UUID
+join Proveedor.Nombre pn
+on pf.id_Proveedor = pn.id_Proveedor; --Creada
+
+select * from vw_Transaccion_Factura vwtf
+order by vwtf.Razon_Social asc;--Correcto
+
+select 
+	vwtf.Razon_Social,
+	sum(vwtf.CFDI_Total) as Total_Facturado
+from vw_Transaccion_Factura vwtf
+group by vwtf.Razon_Social
+order by vwtf.Razon_Social asc;--Correcto
+
+
+
+
+
+
